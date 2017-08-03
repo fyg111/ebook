@@ -1,0 +1,55 @@
+debuge 
+"args": " --debug=32312 "
+
+// handler 热更新开关
+app.set('serverConfig', {
+	reloadHandlers : true
+});
+
+// remote 热更新开关
+app.set('remoteConfig', {
+	reloadRemotes : true
+});
+
+
+app
+app.get('serverId')
+
+connector
+app.getServersByType('connector').length
+connector.host
+connector.clientPort
+
+sessionService
+app.get('sessionService')
+sessionService.getByUid(uid)
+
+session
+session.bind(uid);
+session.set('rid', rid);
+session.push('rid', function(err) {...})
+session.on('closed', function(...){...})
+session.get('rid')
+session.uid
+
+channelService
+app.get('channelService')
+channelService.pushMessageByUids('onChat', param, [{
+	uid: targetUserId,
+	sid: targetServiceId   //app.get('serverId')
+}])
+
+channel
+channelService.getChannel(rid, flag)
+channel.pushMessage('onXXXX', param)
+channel.pushMessage({
+	route: 'onXXXX',
+	param: values
+})
+channel.add(uid, sid)
+channel.getMembers()
+channel.leave(uid, sid)
+
+
+
+
