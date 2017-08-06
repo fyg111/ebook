@@ -14,6 +14,15 @@ app.set('remoteConfig', {
 
 app
 app.get('serverId')
+app.get('curServer').areaId
+app.route('game', routeUtil.game)
+app.before(pomelo.filters.toobusy())
+app.filter(pomelo.filters.serial());
+app.registerAdmin(onlineUser, {app: app})
+app.set('errorHandler', function(err, msg, resp, session, next) {...})
+app.load(RemoveRecord, { interval: 5000 });
+app.getServersFromConfig()[app.getServerId()]
+app.rpc.XXXX.XXXXClass.handlerMothed.toServer(tsid, param, function(err, ret) {...});
 
 connector
 app.getServersByType('connector').length
@@ -22,15 +31,21 @@ connector.clientPort
 
 sessionService
 app.get('sessionService')
+app.sessionServic
 sessionService.getByUid(uid)
+sessionService.getClientAddressBySessionId(session.id)
+sessionService.kick(uid, { code: Code.USER_LOGIN_SOMEWHERE }, function(kerr, ret) {...});
 
 session
 session.bind(uid);
 session.set('rid', rid);
 session.push('rid', function(err) {...})
+session.pushAll()
+session.toFrontendSession().push("rid", null,  function(err) {...});
 session.on('closed', function(...){...})
 session.get('rid')
 session.uid
+session.frontendId
 
 channelService
 app.get('channelService')
