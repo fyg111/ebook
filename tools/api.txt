@@ -67,4 +67,9 @@ channel.leave(uid, sid)
 
 
 
+$ npm install -g node-inspector
+$ node-inspector &
+$ node-inspector --debug-host 192.168.0.2
+http://127.0.0.1:8080/debug?port=32312
+
 
