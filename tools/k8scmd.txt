@@ -1,0 +1,280 @@
+[root@host2 ~]# ifconfig 
+enp0s3: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255
+        inet6 fe80::47f4:8302:6ae:563  prefixlen 64  scopeid 0x20<link>
+        ether 08:00:27:6e:ea:7f  txqueuelen 1000  (Ethernet)
+        RX packets 67  bytes 6320 (6.1 KiB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 97  bytes 8084 (7.8 KiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+enp0s8: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.56.102  netmask 255.255.255.0  broadcast 192.168.56.255
+        inet6 fe80::e724:c51:e955:454a  prefixlen 64  scopeid 0x20<link>
+        ether 08:00:27:58:93:36  txqueuelen 1000  (Ethernet)
+        RX packets 356  bytes 34944 (34.1 KiB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 309  bytes 45415 (44.3 KiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1  (Local Loopback)
+        RX packets 10  bytes 844 (844.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 10  bytes 844 (844.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+service network restart
+
+vim /etc/hosts
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4 host2.wangzheng
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6 host2.wangzheng
+192.168.56.102  localhost localhost.localdomain localhost6 localhost6.localdomain6 host2.wangzheng
+192.168.56.101  host1.wangzheng
+
+sudo yum remove docker docker-engine docker.io
+
+yum install screen -y
+
+screen -R kube
+
+curl -sSL http://acs-public-mirror.oss-cn-hangzhou.aliyuncs.com/docker-engine/internet | sh -
+
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+"registry-mirrors": ["https://8difvy5w.mirror.aliyuncs.com"]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+-----------------------------------------------------------------------
+rm -Rf /root/ssltool
+rm -Rf /root/local
+mkdir -p /root/ssltool
+mkdir -p /root/local/bin
+
+rm -Rf /root/local/bin/*
+cd /root/ssltool
+wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+chmod +x cfssl_linux-amd64
+sudo cp /root/ssltool/cfssl_linux-amd64 /root/local/bin/cfssl
+
+wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+chmod +x cfssljson_linux-amd64
+sudo cp /root/ssltool/cfssljson_linux-amd64 /root/local/bin/cfssljson
+
+wget https://pkg.cfssl.org/R1.2/cfssl-certinfo_linux-amd64
+chmod +x cfssl-certinfo_linux-amd64
+sudo cp /root/ssltool/cfssl-certinfo_linux-amd64 /root/local/bin/cfssl-certinfo
+
+export PATH=/root/local/bin:$PATH
+
+mkdir -p /root/ssl 
+cd /root/ssl
+cfssl print-defaults ca-config > ca-config.json
+cfssl print-defaults ca-csr > ca-csr.json
+
+-------------------------------------------------------------------------
+
+vim ca-config.json
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "kubernetes": {
+        "usages": [
+            "signing",
+            "key encipherment",
+            "server auth",
+            "client auth"
+        ],
+        "expiry": "8760h"
+      }
+    }
+  }
+}
+
+
+vim ca-csr.json
+{
+  "CN": "kubernetes",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "ST": "BeiJing",
+      "L": "BeiJing",
+      "O": "k8s",
+      "OU": "System"
+    }
+  ]
+}
+
+cd /root/ssl/
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+ls ca*
+
+sudo rm -Rf /etc/kubernetes
+sudo mkdir -p /etc/kubernetes/ssl
+sudo cp /root/ssl/ca*.pem /etc/kubernetes/ssl/
+sudo cp /root/ssl/ca.csr /etc/kubernetes/ssl/
+
+-------------------------------------------------------------------------
+rm -Rf /root/etcdssl
+mkdir -p /root/etcdssl
+cd /root/etcdssl
+cfssl print-defaults config > ca-config.json
+cfssl print-defaults csr > ca-csr.json
+
+vim ca-config.json
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "frognew": {
+        "usages": [
+            "signing",
+            "key encipherment",
+            "server auth",
+            "client auth"
+        ],
+        "expiry": "87600h"
+      }
+    }
+  }
+}
+
+vim ca-csr.json
+{
+  "CN": "frognew",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "ST": "BeiJing",
+      "L": "BeiJing",
+      "O": "frognew",
+      "OU": "cloudnative"
+    }
+  ]
+}
+
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+ls ca*
+
+vim etcd-csr.json
+
+{
+    "CN": "frognew",
+    "hosts": [
+      "127.0.0.1",
+      "192.168.56.102",
+      "host2.wangzheng"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "CN",
+            "ST": "BeiJing",
+            "L": "BeiJing",
+            "O": "frognew",
+            "OU": "cloudnative"
+        }
+    ]
+}
+
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=frognew etcd-csr.json | cfssljson -bare etcd
+ls etcd*
+
+rm -Rf /etc/etcd
+mkdir -p /etc/etcd/ssl/
+cp /root/etcdssl/etcd*.pem /etc/etcd/ssl/
+cp /root/etcdssl/ca.pem /etc/etcd/ssl/
+
+export PATH=/root/local/bin:$PATH
+sudo yum remove etcd*
+rm -Rf /usr/bin/etcd*
+
+wget https://github.com/coreos/etcd/releases/download/v3.1.6/etcd-v3.1.6-linux-amd64.tar.gz
+tar -xzvf kubernetes-client-linux-amd64.tar.gz
+cp /root/etcd-v3.1.6-linux-amd64/etcd* /usr/bin/
+
+
+
+**********************
+$ yum list etcd
+$ yum install -y etcd
+**********************
+mkdir -p /var/lib/etcd
+export ETCD_NAME=host2.wangzheng
+export INTERNAL_IP=192.168.56.102
+
+vim  /usr/lib/systemd/system/etcd.service
+
+[Unit]
+Description=etcd server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=-/etc/etcd/etcd.conf
+ExecStart=/usr/bin/etcd \
+  --name ${ETCD_NAME} \
+  --cert-file=/etc/etcd/ssl/etcd.pem \
+  --key-file=/etc/etcd/ssl/etcd-key.pem \
+  --peer-cert-file=/etc/etcd/ssl/etcd.pem \
+  --peer-key-file=/etc/etcd/ssl/etcd-key.pem \
+  --trusted-ca-file=/etc/etcd/ssl/ca.pem \
+  --peer-trusted-ca-file=/etc/etcd/ssl/ca.pem \
+  --initial-advertise-peer-urls https://${INTERNAL_IP}:2380 \
+  --listen-peer-urls https://${INTERNAL_IP}:2380 \
+  --listen-client-urls https://${INTERNAL_IP}:2379,https://127.0.0.1:2379 \
+  --advertise-client-urls https://${INTERNAL_IP}:2379 \
+  --initial-cluster-token etcd-cluster-1 \
+  --initial-cluster host2.wangzheng=https://192.168.56.102:2380 \
+  --initial-cluster-state new \
+  --data-dir=/var/lib/etcd
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+
+
+systemctl daemon-reload
+systemctl enable etcd
+systemctl start etcd
+systemctl status etcd
+
+
+etcdctl \
+  --ca-file=/etc/etcd/ssl/ca.pem \
+  --cert-file=/etc/etcd/ssl/etcd.pem \
+  --key-file=/etc/etcd/ssl/etcd-key.pem \
+  --endpoints=https://192.168.56.102:2379 \
+  cluster-health
+
+
+
